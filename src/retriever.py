@@ -6,7 +6,7 @@ client = chromadb.PersistentClient(path="chroma_db")
 collection = client.get_collection(name="research_papers")
 
 
-def retrieve_chunks(question, top_k=5):
+def retrieve_chunks(question, top_k=10):
     question_embedding = create_embeddings([question])[0]
 
     results = collection.query(
@@ -50,27 +50,3 @@ if __name__ == "__main__":
 
         print("\nText:")
         print(result["document"])
-
-    # --------------------------------------------------
-    # TEMPORARY CHECK:
-    # Find whether "positional" exists in ChromaDB
-    # --------------------------------------------------
-
-    print("\n\n" + "=" * 60)
-    print("SEARCHING CHROMADB FOR 'POSITIONAL'")
-    print("=" * 60)
-
-    stored_results = collection.get(
-        include=["documents", "metadatas"]
-    )
-
-    for i, document in enumerate(stored_results["documents"]):
-
-        if "positional" in document.lower():
-
-            print("\n" + "=" * 60)
-            print("Document:", i)
-            print("Metadata:", stored_results["metadatas"][i])
-
-            print("Text:")
-            print(document)

@@ -1,4 +1,5 @@
 import chromadb
+import os 
 
 from pdf_loader import load_pdf
 from chunking import chunk_pages
@@ -40,20 +41,37 @@ def store_chunks(chunks, source):
         metadatas=metadatas
     )
 
+def process_pdf(file_path):
 
-if __name__ == "__main__":
+    source = os.path.basename(file_path)
 
-    pdf_path = "data/papers/paper1.pdf"
+    print(f"\nProcessing: {source}")
 
-    pages = load_pdf(pdf_path)
+    pages = load_pdf(file_path)
 
     chunks = chunk_pages(pages)
 
-    print("Chunks:", len(chunks))
+    print(f"Pages: {len(pages)}")
+    print(f"Chunks: {len(chunks)}")
 
-    store_chunks(
-        chunks,
-        source="paper1.pdf"
-    )
+    store_chunks(chunks, source)
 
-    print("Chunks stored in ChromaDB.")
+    print(f"Stored: {source}")
+
+
+if __name__ == "__main__":
+
+    papers_folder = "data/papers"
+
+    for filename in os.listdir(papers_folder):
+
+        if filename.lower().endswith(".pdf"):
+
+            file_path = os.path.join(
+                papers_folder,
+                filename
+            )
+
+            process_pdf(file_path)
+
+    print("\nAll papers processed successfully.")
