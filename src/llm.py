@@ -84,6 +84,10 @@ If the answer cannot be found in the context, say:
 
 Do not make up information.
 
+If the user asks for a summary, summarize the important
+ideas, methods, findings, and conclusions present in
+the retrieved context.
+
 If the retrieved context contains conflicting information, do not silently choose one value. 
 Clearly mention the conflicting values and identify where each value appears.
 
