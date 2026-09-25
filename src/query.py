@@ -1,5 +1,5 @@
 from retriever import retrieve_chunks, get_document_chunks
-from llm import generate_answer
+from llm import generate_answer, compare_papers, replace_comparison_citations
 
 
 def ask_question(question, top_k=10):
@@ -27,11 +27,33 @@ def summarize_paper(source):
 
     return summary
 
+def compare_two_papers(source_a, source_b, comparison_focus):
+
+    # Get all chunks from both papers
+    chunks_a = get_document_chunks(source_a)
+    chunks_b = get_document_chunks(source_b)
+
+    # Generate comparison
+    comparison = compare_papers(
+        chunks_a,
+        chunks_b,
+        comparison_focus
+    )
+
+    # Convert SOURCE A/B markers into real citations
+    comparison = replace_comparison_citations(
+        comparison,
+        chunks_a,
+        chunks_b
+    )
+
+    return comparison
+
 
 if __name__ == "__main__":
 
     choice = input(
-        "Enter 1 for Question Answering or 2 for Paper Summary: "
+        "Enter 1 for Question Answering, 2 for Paper Summary, 3 for comparing docs: "
     )
 
     if choice == "1":
@@ -51,6 +73,24 @@ if __name__ == "__main__":
 
         print("\nSummary:")
         print(summary)
+
+    elif choice == "3":
+
+        source_a = input("Enter first PDF name: ")
+        source_b = input("Enter second PDF name: ")
+
+        comparison_focus = input(
+            "What do you want to compare? "
+        )
+
+        comparison = compare_two_papers(
+            source_a,
+            source_b,
+            comparison_focus
+        )
+
+        print("\nComparison:")
+        print(comparison)
 
     else:
 

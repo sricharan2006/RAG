@@ -55,6 +55,60 @@ def replace_citations(answer, retrieved_chunks):
         answer
     )
 
+def replace_comparison_citations(
+    answer,
+    chunks_a,
+    chunks_b
+):
+
+    def replace_match(match):
+
+        source_markers = re.findall(
+            r"SOURCE\s+([AB])(\d+)",
+            match.group(0)
+        )
+
+        citations = []
+
+        for source_type, source_number in source_markers:
+
+            source_number = int(source_number)
+
+            if source_type == "A":
+                chunks = chunks_a
+            else:
+                chunks = chunks_b
+
+            index = source_number - 1
+
+            if 0 <= index < len(chunks):
+
+                result = chunks[index]
+
+                source = result["metadata"]["source"]
+                page = result["metadata"]["page"]
+                section = result["metadata"].get("section")
+
+                if section:
+                    citation = (
+                        f"[{source}, Page {page}, "
+                        f"Section: {section}]"
+                    )
+                else:
+                    citation = (
+                        f"[{source}, Page {page}]"
+                    )
+
+                citations.append(citation)
+
+        return " ".join(citations)
+
+    return re.sub(
+        r"\[SOURCE\s+[AB]\d+(?:\s*,\s*SOURCE\s+[AB]\d+)*\]",
+        replace_match,
+        answer
+    )
+
 
 def generate_answer(question, retrieved_chunks):
     context_parts = []
@@ -142,5 +196,112 @@ Answer clearly and concisely.
 
         return answer
     except Exception as e:
+        print("Error:", e)
+        raise
+
+def compare_papers(chunks_a, chunks_b, comparison_focus):
+
+    context_a = []
+
+    for i, chunk in enumerate(chunks_a, start=1):
+
+        context_a.append(
+            f"""
+SOURCE A{i}
+
+Source: {chunk['metadata']['source']}
+Page: {chunk['metadata']['page']}
+Section: {chunk['metadata'].get('section', 'Unknown')}
+
+{chunk['document']}
+"""
+        )
+
+    context_a = "\n".join(context_a)
+
+    context_b = []
+
+    for i, chunk in enumerate(chunks_b, start=1):
+
+        context_b.append(
+            f"""
+SOURCE B{i}
+
+Source: {chunk['metadata']['source']}
+Page: {chunk['metadata']['page']}
+Section: {chunk['metadata'].get('section', 'Unknown')}
+
+{chunk['document']}
+"""
+        )
+
+    context_b = "\n".join(context_b)
+
+    prompt = f"""
+You are a research paper comparison assistant.
+
+Compare the two provided documents based ONLY on the information
+contained in their retrieved contexts.
+
+Comparison focus:
+{comparison_focus}
+
+Do not make up information.
+
+First determine whether the two documents contain enough
+relevant information to perform the requested comparison.
+
+If the documents are unrelated to the requested comparison focus,
+clearly state that a meaningful comparison cannot be made.
+Do not force similarities or differences.
+
+If a meaningful comparison is possible, analyze:
+
+1. Similarities
+2. Differences
+3. Important observations related to the requested focus
+
+Only include information that is supported by the provided contexts.
+
+For every factual statement, indicate the supporting source using
+[SOURCE A1], [SOURCE A2], [SOURCE B1], [SOURCE B2], etc.
+
+SOURCE A refers to the first document.
+SOURCE B refers to the second document.
+
+These source markers are internal citation markers.
+Do not write actual page numbers, filenames, or section names yourself.
+They will be automatically converted into document citations.
+
+Use the smallest number of sources needed to support each statement.
+
+Do not repeat sources unnecessarily.
+
+If information needed for the comparison is not present in either
+document, explicitly state that it is not available in the provided
+context.
+
+Document A:
+
+{context_a}
+
+Document B:
+
+{context_b}
+
+Provide a clear and concise comparison.
+"""
+
+    try:
+
+        response = client.models.generate_content(
+            model=MODEL_NAME,
+            contents=prompt
+        )
+
+        return response.text
+
+    except Exception as e:
+
         print("Error:", e)
         raise
