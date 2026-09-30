@@ -1,9 +1,9 @@
 import chromadb
 import os 
 
-from pdf_loader import load_pdf
-from chunking import chunk_pages
-from embeddings import create_embeddings
+from src.pdf_loader import load_pdf
+from src.chunking import chunk_pages
+from src.embeddings import create_embeddings
 
 
 client = chromadb.PersistentClient(
@@ -57,6 +57,21 @@ def process_pdf(file_path):
     store_chunks(chunks, source)
 
     print(f"Stored: {source}")
+
+def delete_pdf(source):
+    # Delete all chunks belonging to this PDF from ChromaDB
+    collection.delete(
+        where={"source": source}
+    )
+
+    # Delete the actual PDF file
+    papers_folder = "data/papers"
+    file_path = os.path.join(papers_folder, source)
+
+    if os.path.exists(file_path):
+        os.remove(file_path)
+
+    print(f"Deleted: {source}")
 
 
 if __name__ == "__main__":

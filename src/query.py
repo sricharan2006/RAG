@@ -1,11 +1,11 @@
-from retriever import retrieve_chunks, get_document_chunks
-from llm import generate_answer, compare_papers, replace_comparison_citations
+from src.retriever import retrieve_chunks, get_document_chunks
+from src.llm import generate_answer, compare_papers, replace_comparison_citations
 
 
 def ask_question(question, top_k=10):
 
     # Retrieve relevant chunks
-    results = retrieve_chunks(question, top_k=top_k)
+    results = retrieve_chunks(question, top_k=top_k, source=source)
 
     # Generate answer using retrieved chunks
     answer = generate_answer(question, results)

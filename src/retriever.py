@@ -1,6 +1,6 @@
 import chromadb
 import re
-from embeddings import create_embeddings
+from src.embeddings import create_embeddings
 
 client = chromadb.PersistentClient(path="chroma_db")
 collection = client.get_collection(name="research_papers")

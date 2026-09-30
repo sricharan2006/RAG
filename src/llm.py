@@ -10,7 +10,7 @@ client = genai.Client(
     api_key=os.getenv("GEMINI_API_KEY")
 )#Then the key is passed to Gemini's client so your program can communicate with the Gemini API.
 
-MODEL_NAME = "gemini-3.5-flash"
+MODEL_NAME = "gemini-3.8-flash"
 
 # This func is added in the later stages of testing to prevent the returning of SOURCE 1, SOURCE 2 words and replace it with actual sources.
 def replace_citations(answer, retrieved_chunks):
