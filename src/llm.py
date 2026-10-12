@@ -10,7 +10,7 @@ client = genai.Client(
     api_key=os.getenv("GEMINI_API_KEY")
 )#Then the key is passed to Gemini's client so your program can communicate with the Gemini API.
 
-MODEL_NAME = "gemini-3.8-flash"
+MODEL_NAME = "gemini-3.5-flash-lite"
 
 # This func is added in the later stages of testing to prevent the returning of SOURCE 1, SOURCE 2 words and replace it with actual sources.
 def replace_citations(answer, retrieved_chunks):
@@ -33,11 +33,12 @@ def replace_citations(answer, retrieved_chunks):
 
                 result = retrieved_chunks[index]
 
+                source = result["metadata"]["source"]
                 page = result["metadata"]["page"]
                 section = result["metadata"].get("section")
 
                 if section:
-                    citation = f"[Page {page}, Section: {section}]"
+                    citation = f"[{source}, Page {page}, Section: {section}]"
                 else:
                     citation = f"[Page {page}]"
 
@@ -186,7 +187,7 @@ Answer clearly and concisely.
             model=MODEL_NAME,
             contents=prompt
         )
-        answer = response.text #This returns an object out of which we need the .text par
+        answer = response.text #This returns an object out of which we need the .text part
 
         # Replace SOURCE labels with actual page/section citations
         answer = replace_citations(
@@ -299,7 +300,16 @@ Provide a clear and concise comparison.
             contents=prompt
         )
 
-        return response.text
+        answer = response.text
+
+        # Replace temporary labels with actual document citations
+        answer = replace_comparison_citations(
+            answer,
+            chunks_a,
+            chunks_b
+        )
+
+        return answer
 
     except Exception as e:
 

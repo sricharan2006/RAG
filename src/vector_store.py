@@ -66,7 +66,7 @@ def delete_pdf(source):
 
     # Delete the actual PDF file
     papers_folder = "data/papers"
-    file_path = os.path.join(papers_folder, source)
+    file_path = os.path.join(papers_folder, source) #Constructs the file path for deletion. It also needs to know the location of the file present.
 
     if os.path.exists(file_path):
         os.remove(file_path)

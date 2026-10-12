@@ -2,7 +2,7 @@ from src.retriever import retrieve_chunks, get_document_chunks
 from src.llm import generate_answer, compare_papers, replace_comparison_citations
 
 
-def ask_question(question, top_k=10):
+def ask_question(question, top_k=10, source=None):
 
     # Retrieve relevant chunks
     results = retrieve_chunks(question, top_k=top_k, source=source)
