@@ -7,6 +7,16 @@ def ask_question(question, top_k=10, source=None):
     # Retrieve relevant chunks
     results = retrieve_chunks(question, top_k=top_k, source=source)
 
+    print("\n--- RETRIEVED CHUNKS ---")
+    for i, result in enumerate(results, start=1):
+        print(f"\nChunk {i}")
+        print("Metadata:", result["metadata"])
+        print("Distance:", result["distance"])
+        try:
+            print("Text:", result["document"][:300])
+        except UnicodeEncodeError:
+            print("Text:", result["document"][:300].encode("ascii", "replace").decode("ascii"))
+
     # Generate answer using retrieved chunks
     answer = generate_answer(question, results)
 
@@ -20,8 +30,7 @@ def summarize_paper(source):
 
     # Generate summary using the complete paper
     summary = generate_answer(
-        "Summarize this research paper, including its main problem, "
-        "approach, key findings, and conclusion.",
+        "When summarizing a document, identify its central purpose, main ideas, key evidence, and overall conclusions, where applicable. Adapt the summary to the document's actual content and structure rather than forcing a fixed set of categories. Include only the most relevant details and statistics. Avoid repetition and unnecessary explanations. Preserve the source's meaning and distinguish established facts from opinions, interpretations, and claims that the evidence does not fully support. Place citations close to the claims they support, use accurate source metadata, and avoid redundant citations. Do not invent information to fill gaps when a topic is absent or not addressed in the document.",
         chunks
     )
 

@@ -8,25 +8,12 @@ class ResearchPaperChunker:
         self.chunk_overlap = chunk_overlap
 
     def is_section_heading(self, line):
-        """
-        Detect common research-paper section headings.
-
-        Examples:
-        1 Introduction
-        2 Related Work
-        3 Model Architecture
-        3.1 Encoder and Decoder Stacks
-        Abstract
-        Conclusion
-        References
-        """
 
         line = line.strip()
 
         if not line:
             return False
 
-        # Common unnumbered research-paper sections
         common_sections = {
             "abstract",
             "introduction",
@@ -38,38 +25,49 @@ class ResearchPaperChunker:
             "experiments",
             "experimental setup",
             "results",
+            "findings",
             "discussion",
             "conclusion",
+            "discussion and conclusions",
             "future work",
             "acknowledgements",
             "acknowledgments",
             "references",
         }
 
+        # Recognize unnumbered headings.
         if line.lower() in common_sections:
             return True
 
-        # Numbered sections:
-        #
+        # Recognize headings such as:
+        # 4. Findings
+        # 4.1. Usage of mobile devices
         # 1 Introduction
-        # 2 Related Work
-        # 3 Model Architecture
-        # 3.1 Encoder and Decoder Stacks
-        # 3.2 Attention
-        #
-        # Important:
-        # Don't treat things such as
-        # "2014 English-French dataset..."
-        # or
-        # "1.0 · 10^20"
-        # as headings.
+        # 3.1 Model Architecture
+        # Do not recognize "5 years".
+        match = re.fullmatch(
+            r"(\d{1,2}(?:\.\d{1,2})*)\.?\s+([A-Za-z][^\n]{1,90})",
+            line,
+        )
 
-        pattern = r"^\d{1,2}(?:\.\d{1,2})*\s+[A-Za-z][A-Za-z0-9 ,:;()'\"/\-–]*$"
+        if not match:
+            return False
 
-        if re.match(pattern, line):
-            return True
+        heading_text = match.group(2).strip()
 
-        return False
+        # Reject numeric values and short table-like entries.
+        if re.fullmatch(
+            r"\d+\s+(years?|months?|weeks?|days?)",
+            line,
+            re.IGNORECASE,
+        ):
+            return False
+
+        # Require a plausible title rather than a single ordinary word.
+        if len(heading_text.split()) < 2:
+            return heading_text.lower() in common_sections
+
+        return True
 
     def clean_text(self, text):
         """
@@ -288,9 +286,9 @@ def chunk_pages(pages):
 
 if __name__ == "__main__":
 
-    from pdf_loader import load_pdf
+    from src.pdf_loader import load_pdf
 
-    file_path = "data/papers/paper1.pdf"
+    file_path = "data/papers/research paper.pdf"
 
     pages = load_pdf(file_path)
 

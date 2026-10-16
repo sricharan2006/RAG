@@ -30,16 +30,22 @@ def store_chunks(chunks, source):
         metadatas.append({
             "source": source,
             "page": chunk["page"],
-            "section": chunk.get("section")
+            "section": chunk.get("section") or "Unknown"
         })
-
-    collection.upsert( #Here we are doing upsert instead of add bcz, upsert replaces or updates if the same ID is present, so running this file multiple times,
-        #does not affect but adds litrelly adds it everytime leading to duplicates
-        ids=ids,
-        documents=texts,
-        embeddings=embeddings.tolist(),
-        metadatas=metadatas
+    
+    # Remove old chunks for this PDF first.
+    collection.delete(
+        where={"source": source}
     )
+
+    # Store the newly generated chunks.
+    if ids:
+        collection.upsert(
+            ids=ids,
+            documents=texts,
+            embeddings=embeddings.tolist(),
+            metadatas=metadatas
+        )
 
 def process_pdf(file_path):
 

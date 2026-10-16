@@ -71,32 +71,89 @@ def compare(request: ComparisonRequest):
     }
 
 @app.post("/upload")
-async def upload_pdf(file: UploadFile = File(...)):
+async def upload_pdf(
+    files: list[UploadFile] = File(None),
+    file: UploadFile = File(None)
+):
+    upload_list = []
+    if files:
+        upload_list.extend(files)
+    if file:
+        upload_list.append(file)
 
-    if not file.filename.lower().endswith(".pdf"):
+    if not upload_list:
         return {
-            "error": "Only PDF files are supported."
+            "error": "No file uploaded.",
+            "results": [],
+            "success_count": 0,
+            "total_count": 0
         }
 
     papers_folder = "data/papers"
-
     os.makedirs(papers_folder, exist_ok=True)
 
-    file_path = os.path.join(
-        papers_folder,
-        file.filename
-    )
+    results = []
+    success_count = 0
 
-    contents = await file.read()
+    for f in upload_list:
+        filename = f.filename
+        if not filename or not filename.lower().endswith(".pdf"):
+            results.append({
+                "filename": filename or "unknown",
+                "status": "error",
+                "error": "Only PDF files are supported."
+            })
+            continue
 
-    with open(file_path, "wb") as f:
-        f.write(contents)
+        try:
+            file_path = os.path.join(papers_folder, filename)
+            contents = await f.read()
 
-    process_pdf(file_path)
+            with open(file_path, "wb") as out_file:
+                out_file.write(contents)
+
+            # process_pdf indexes the PDF into ChromaDB and removes old chunks for safe re-uploads
+            process_pdf(file_path)
+            success_count += 1
+
+            results.append({
+                "filename": filename,
+                "status": "success",
+                "message": f"'{filename}' uploaded and indexed successfully."
+            })
+        except Exception as e:
+            results.append({
+                "filename": filename,
+                "status": "error",
+                "error": f"Failed to process '{filename}': {str(e)}"
+            })
+
+    # Backward compatible single-file response
+    if len(upload_list) == 1:
+        single = results[0]
+        if single["status"] == "success":
+            return {
+                "message": single["message"],
+                "filename": single["filename"],
+                "results": results,
+                "success_count": 1,
+                "total_count": 1
+            }
+        else:
+            return {
+                "error": single["error"],
+                "filename": single["filename"],
+                "results": results,
+                "success_count": 0,
+                "total_count": 1
+            }
 
     return {
-        "message": "PDF uploaded and processed successfully.",
-        "filename": file.filename
+        "message": f"Processed {success_count} of {len(upload_list)} file(s) successfully.",
+        "results": results,
+        "success_count": success_count,
+        "total_count": len(upload_list),
+        "filenames": [r["filename"] for r in results if r["status"] == "success"]
     }
 
 # /ask uses a Pydantic model because it receives JSON, while /upload uses UploadFile = File(...) because it receives a file through multipart/form-data

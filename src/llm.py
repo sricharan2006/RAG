@@ -17,9 +17,9 @@ def replace_citations(answer, retrieved_chunks):
 
     def replace_match(match):
         # Extract all source numbers from something like:
-        # [SOURCE 1, SOURCE 2, SOURCE 3]
+        # [SOURCE 1], [SOURCE 1, 2], [SOURCE 1, SOURCE 2]
         source_numbers = re.findall(
-            r"SOURCE\s+(\d+)",
+            r"\b\d+\b",
             match.group(0)
         )
 
@@ -37,24 +37,41 @@ def replace_citations(answer, retrieved_chunks):
                 page = result["metadata"]["page"]
                 section = result["metadata"].get("section")
 
-                if section:
+                if section and section.lower() != "unknown":
                     citation = f"[{source}, Page {page}, Section: {section}]"
                 else:
-                    citation = f"[Page {page}]"
+                    citation = f"[{source}, Page {page}]"
 
                 citations.append(citation)
 
-        return " ".join(citations)
+        # Deduplicate citations within this marker while preserving order
+        unique_citations = []
+        seen = set()
+        for c in citations:
+            if c not in seen:
+                seen.add(c)
+                unique_citations.append(c)
+
+        return " ".join(unique_citations)
 
     # Handles:
     # [SOURCE 1]
+    # [SOURCE 1, 2]
     # [SOURCE 1, SOURCE 2]
-    # [SOURCE 1, SOURCE 2, SOURCE 3]
-    return re.sub(
-        r"\[SOURCE\s+\d+(?:\s*,\s*SOURCE\s+\d+)*\]",
+    # [SOURCE 1, 2, 3]
+    answer = re.sub(
+        r"\[\s*SOURCE:?\s*\d+(?:[,\s;]+(?:SOURCE:?\s*)?\d+)*\s*\]",
         replace_match,
-        answer
+        answer,
+        flags=re.IGNORECASE
     )
+
+    # Collapse consecutive identical citations: [cit] [cit] -> [cit]
+    answer = re.sub(r"(\[[^\]]+\])(?:\s*\1)+", r"\1", answer)
+    answer = re.sub(r" +([.,;])", r"\1", answer)
+    answer = re.sub(r" {2,}", " ", answer)
+
+    return answer
 
 def replace_comparison_citations(
     answer,
@@ -63,24 +80,26 @@ def replace_comparison_citations(
 ):
 
     def replace_match(match):
-
-        source_markers = re.findall(
-            r"SOURCE\s+([AB])(\d+)",
-            match.group(0)
+        # Extract all marker components: letter (optional) and digits
+        # Handles [SOURCE B10, B20], [SOURCE A2, A12], [SOURCE A1, B2], etc.
+        tokens = re.findall(
+            r"([AB])?\s*(\d+)",
+            match.group(0),
+            re.IGNORECASE
         )
 
         citations = []
+        current_type = None
 
-        for source_type, source_number in source_markers:
+        for doc_type, num_str in tokens:
+            if doc_type:
+                current_type = doc_type.upper()
 
-            source_number = int(source_number)
+            if not current_type:
+                continue
 
-            if source_type == "A":
-                chunks = chunks_a
-            else:
-                chunks = chunks_b
-
-            index = source_number - 1
+            chunks = chunks_a if current_type == "A" else chunks_b
+            index = int(num_str) - 1
 
             if 0 <= index < len(chunks):
 
@@ -90,7 +109,7 @@ def replace_comparison_citations(
                 page = result["metadata"]["page"]
                 section = result["metadata"].get("section")
 
-                if section:
+                if section and section.lower() != "unknown":
                     citation = (
                         f"[{source}, Page {page}, "
                         f"Section: {section}]"
@@ -101,14 +120,38 @@ def replace_comparison_citations(
                     )
 
                 citations.append(citation)
+            else:
+                # Out-of-bounds invalid ID: NEVER map to an incorrect source
+                continue
 
-        return " ".join(citations)
+        # Deduplicate citations within this marker while preserving order
+        unique_citations = []
+        seen = set()
+        for c in citations:
+            if c not in seen:
+                seen.add(c)
+                unique_citations.append(c)
 
-    return re.sub(
-        r"\[SOURCE\s+[AB]\d+(?:\s*,\s*SOURCE\s+[AB]\d+)*\]",
+        return " ".join(unique_citations)
+
+    # Handles:
+    # [SOURCE A1]
+    # [SOURCE B10, B20]
+    # [SOURCE A1, B2]
+    # [SOURCE A1, SOURCE B2]
+    answer = re.sub(
+        r"\[\s*SOURCE:?\s*[AB]\d+(?:[,\s;]+(?:SOURCE:?\s*)?[AB]?\d+)*\s*\]",
         replace_match,
-        answer
+        answer,
+        flags=re.IGNORECASE
     )
+
+    # Collapse consecutive identical citations: [cit] [cit] -> [cit]
+    answer = re.sub(r"(\[[^\]]+\])(?:\s*\1)+", r"\1", answer)
+    answer = re.sub(r" +([.,;])", r"\1", answer)
+    answer = re.sub(r" {2,}", " ", answer)
+
+    return answer
 
 
 def generate_answer(question, retrieved_chunks):
@@ -146,18 +189,20 @@ the retrieved context.
 If the retrieved context contains conflicting information, do not silently choose one value. 
 Clearly mention the conflicting values and identify where each value appears.
 
-For every factual statement, indicate the supporting source
-using [SOURCE 1], [SOURCE 2], etc.
+Answer every part of the user's question, and ensure the response ends cleanly. Do not leave sentences, bullet points, or citations incomplete.
 
-These [SOURCE N] markers are internal citation markers.
-Do not write actual page numbers, section names, or filenames yourself.
-Use only the [SOURCE N] markers in your answer.
-They will be automatically converted into the corresponding
-document, page, and section citations after the answer is generated.
+Avoid repeating the same technical detail across multiple sections when it can be explained clearly onces
 
-Use the smallest number of sources needed to support a statement.
-If one source is sufficient, use only one source.
-Do not repeat the same source unnecessarily.
+Preserve the document's actual terminology and section metadata.
+
+Citation instructions:
+- Prefer one citation at the end of a paragraph containing related claims supported by the same source, instead of citing every sentence.
+- These [SOURCE N] markers are internal citation markers. Do not write actual page numbers, section names, or filenames yourself. Use only the [SOURCE N] markers in your answer.
+- Cite at the end of a sentence or a group of related claims rather than after every individual phrase or clause.
+- Use one citation for a group of related claims when that citation clearly supports them.
+- Avoid repeating citations unnecessarily. Do not chain multiple citations (e.g. [SOURCE 1][SOURCE 2][SOURCE 3]) when a single source is sufficient.
+- Keep citations for distinct claims when different sources or pages are required.
+- Return only the answer requested by the user. Do not add a separate source list unless requested.
 
 For comparison questions involving multiple documents, use relevant
 evidence from each document when available. Clearly distinguish
@@ -264,23 +309,25 @@ If a meaningful comparison is possible, analyze:
 
 Only include information that is supported by the provided contexts.
 
-For every factual statement, indicate the supporting source using
-[SOURCE A1], [SOURCE A2], [SOURCE B1], [SOURCE B2], etc.
-
-SOURCE A refers to the first document.
-SOURCE B refers to the second document.
-
-These source markers are internal citation markers.
-Do not write actual page numbers, filenames, or section names yourself.
-They will be automatically converted into document citations.
-
-Use the smallest number of sources needed to support each statement.
-
-Do not repeat sources unnecessarily.
+Citation rules for comparison:
+- For factual statements, indicate the supporting source using [SOURCE A1], [SOURCE A2] for Document A, and [SOURCE B1], [SOURCE B2] for Document B.
+- SOURCE A refers to the first document. SOURCE B refers to the second document.
+- These source markers are internal citation markers. Do not write actual page numbers, filenames, or section names yourself; they will be converted automatically into document citations.
+- Cite at the end of a sentence or group of related claims rather than after every individual phrase or clause.
+- Use one citation for a group of related claims when that citation clearly supports them. Avoid stacking three or more citations together when a single citation is sufficient.
+- When making comparative claims, include supporting citations for both documents (e.g. [SOURCE A1] and [SOURCE B1]) so evidence from each document is clearly represented.
+- Maintain citations for distinct claims, but do not repeat identical or unnecessary citations.
 
 If information needed for the comparison is not present in either
 document, explicitly state that it is not available in the provided
 context.
+
+For documents with different topics, do not repeatedly summarize each document to justify that they are unrelated. 
+Briefly identify their different purposes using one citation per document, then assess whether the requested comparison criteria can be compared.
+Compare shared high-level aspects only when supported by evidence. If the context lacks sufficient evidence, state which aspects cannot be compared. 
+Avoid repeating the same citations across consecutive paragraphs.
+When identifying each document's topic, use one relevant citation per document; do not add more citations unless they support a distinct claim
+
 
 Document A:
 
