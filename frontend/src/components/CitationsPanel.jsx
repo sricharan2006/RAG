@@ -13,7 +13,7 @@ import {
 import { getSourceColorPalette } from '../utils/sourceColors';
 
 export default function CitationsPanel({
-  citations,
+  citations = [],
   isOpen,
   onClose,
   highlightedCitation,
@@ -23,10 +23,9 @@ export default function CitationsPanel({
   const [filterSource, setFilterSource] = useState('ALL');
   const [copiedId, setCopiedId] = useState(null);
 
-  if (!isOpen) return null;
-
   // Extract unique sources in citations
-  const uniqueSources = Array.from(new Set(citations.map(c => c.source)));
+  const safeCitations = Array.isArray(citations) ? citations : [];
+  const uniqueSources = Array.from(new Set(safeCitations.map(c => c.source)));
 
   // Reset filter if active filter source is no longer present in current citations
   React.useEffect(() => {
@@ -37,7 +36,7 @@ export default function CitationsPanel({
 
   // If highlighted citation belongs to another source than currently filtered, switch filter to ALL so it is visible and scroll to card
   React.useEffect(() => {
-    if (highlightedCitation) {
+    if (isOpen && highlightedCitation) {
       if (filterSource !== 'ALL' && highlightedCitation.source && highlightedCitation.source !== filterSource) {
         setFilterSource('ALL');
       }
@@ -55,11 +54,7 @@ export default function CitationsPanel({
 
       return () => clearTimeout(timer);
     }
-  }, [highlightedCitation, filterSource]);
-
-  const filteredCitations = filterSource === 'ALL'
-    ? citations
-    : citations.filter(c => c.source === filterSource);
+  }, [isOpen, highlightedCitation, filterSource]);
 
   const isCitationMatch = (c, target) => {
     if (!target) return false;
@@ -77,6 +72,15 @@ export default function CitationsPanel({
     setTimeout(() => setCopiedId(null), 1800);
   };
 
+  // If panel is not open, do not render markup (called AFTER all hooks to adhere to Rules of Hooks)
+  if (!isOpen) {
+    return null;
+  }
+
+  const filteredCitations = filterSource === 'ALL'
+    ? safeCitations
+    : safeCitations.filter(c => c.source === filterSource);
+
   return (
     <aside className="citations-panel animate-fade-in" id="panel-citations">
       {/* Panel Header */}
@@ -84,12 +88,18 @@ export default function CitationsPanel({
         <div className="citations-title-wrap">
           <Bookmark size={18} className="text-primary-light" />
           <h2 className="citations-title">Sources & Citations</h2>
-          <span className="citations-badge">{citations.length}</span>
+          <span className="citations-badge">{safeCitations.length}</span>
         </div>
         <button
+          type="button"
           className="citations-close-btn"
-          onClick={onClose}
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            onClose?.();
+          }}
           title="Close citations panel"
+          aria-label="Close citations panel"
         >
           <X size={16} />
         </button>

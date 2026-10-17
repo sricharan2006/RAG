@@ -194,7 +194,12 @@ export default function SummaryView({
                 {citations.length > 0 && (
                   <button
                     className="summary-citations-badge"
-                    onClick={() => setActiveCitations(citations)}
+                    onClick={() => {
+                      setActiveCitations(citations);
+                      if (citations.length > 0) {
+                        onSelectCitation?.(citations[0]);
+                      }
+                    }}
                     title="View all citations in side panel"
                   >
                     <Bookmark size={13} />

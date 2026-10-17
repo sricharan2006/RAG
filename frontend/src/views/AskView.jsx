@@ -205,7 +205,12 @@ export default function AskView({
                           {citations.length > 0 && (
                             <span 
                               className="bubble-citation-count"
-                              onClick={() => setActiveCitations(citations)}
+                              onClick={() => {
+                                setActiveCitations(citations);
+                                if (citations.length > 0) {
+                                  onSelectCitation?.(citations[0]);
+                                }
+                              }}
                               title="Click to view detailed citations"
                             >
                               <Bookmark size={11} />

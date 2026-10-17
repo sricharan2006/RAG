@@ -241,7 +241,12 @@ export default function CompareView({
                   {citations.length > 0 && (
                     <button
                       className="summary-citations-badge"
-                      onClick={() => setActiveCitations(citations)}
+                      onClick={() => {
+                        setActiveCitations(citations);
+                        if (citations.length > 0) {
+                          onSelectCitation?.(citations[0]);
+                        }
+                      }}
                       title="View citations in side panel"
                     >
                       <Bookmark size={13} />
